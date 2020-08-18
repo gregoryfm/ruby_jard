@@ -5,25 +5,20 @@ module RubyJard
     ##
     # Display source code of current stopping line and surrounding lines
     class SourceScreen < RubyJard::Screen
-      ANONYMOUS_SIGNATURES = [
-        '(eval)', '-e'
-      ].freeze
-
       def title
         return 'Source' if @session.current_frame.nil?
 
-        decorated_path = path_decorator(@session.current_frame.frame_file, @session.current_frame.frame_line)
-        if decorated_path.gem?
-          ['Source', "#{decorated_path.gem} - #{decorated_path.path}:#{decorated_path.lineno}"]
+        if path_decorator.source_tree? || path_decorator.unknown?
+          ['Source', "#{path_decorator.path_label}:#{path_decorator.lineno}"]
         else
-          ['Source', "#{decorated_path.path}:#{decorated_path.lineno}"]
+          ['Source', path_decorator.path_label]
         end
       end
 
       def build
         return if @session.current_frame.nil?
 
-        if ANONYMOUS_SIGNATURES.include? @session.current_frame.frame_file
+        if path_decorator.evaluation?
           # (eval) is hard-coded in Ruby source code for in-code evaluation
           handle_anonymous_evaluation
         else
@@ -87,7 +82,7 @@ module RubyJard
         lineno = source_lineno(index)
         RubyJard::Span.new(
           margin_right: 1,
-          content: @session.current_frame.frame_line == lineno ? '➠' : ' ',
+          content: @session.current_frame.frame_line == lineno ? '⮕' : ' ',
           styles: :source_line_mark
         )
       end
@@ -105,10 +100,6 @@ module RubyJard
         spans
       end
 
-      def path_decorator(path, lineno)
-        @path_decorator ||= RubyJard::Decorators::PathDecorator.new(path, lineno)
-      end
-
       def source_decorator
         @source_decorator ||= RubyJard::Decorators::SourceDecorator.new(
           @session.current_frame.frame_file, @session.current_frame.frame_line, @layout.height
@@ -121,6 +112,13 @@ module RubyJard
 
       def source_lineno(index)
         source_decorator.window_start + index
+      end
+
+      def path_decorator
+        @path_decorator ||= RubyJard::Decorators::PathDecorator.new(
+          @session.current_frame.frame_file,
+          @session.current_frame.frame_line
+        )
       end
     end
   end
